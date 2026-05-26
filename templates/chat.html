@@ -1,0 +1,446 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="h-[calc(100vh-10rem)] flex overflow-hidden glass-panel rounded-2xl border border-gray-800/80">
+    
+    <!-- 1. 채팅방 리스트 사이드바 (Sidebar) -->
+    <div class="w-72 border-r border-gray-800/80 flex flex-col justify-between h-full bg-gray-950/20">
+        <div class="p-5 border-b border-gray-800/60 shrink-0">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-outfit font-bold text-gray-200">채팅 채널</h3>
+                <button onclick="toggleCreateModal(true)" class="text-xs bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer">
+                    <i class="fa-solid fa-plus text-[10px]"></i> 생성
+                </button>
+            </div>
+            
+            <!-- 채널 검색 (클라이언트 필터) -->
+            <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 text-xs">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input id="room-search" oninput="filterRooms()" type="text" placeholder="채팅방 이름 검색..." class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-lg py-1.5 pl-9 pr-3 text-xs outline-none transition-colors text-gray-200">
+            </div>
+        </div>
+        
+        <!-- 채팅방 목록 -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-1" id="rooms-container">
+            {% if rooms %}
+                {% for room in rooms %}
+                <a href="{{ url_for('chat', room_id=room.id) }}" class="room-item block p-3 rounded-xl transition-all duration-300 {% if active_room and active_room.id == room.id %} bg-emerald-500/10 border border-emerald-500/10 text-emerald-400 active-glow {% else %} text-gray-400 hover:bg-gray-800/40 hover:text-gray-200 {% endif %}" data-name="{{ room.name }}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="text-sm font-semibold">
+                                <i class="fa-regular fa-comments text-xs mr-1 text-emerald-500/80"></i> {{ room.name }}
+                            </span>
+                        </div>
+                        <span class="text-[9px] text-gray-500">
+                            {% if room.last_msg_time %}
+                                {{ room.last_msg_time[11:16] }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if room.last_msg %}
+                    <p class="text-xs text-gray-500 truncate mt-1 leading-normal font-sans">
+                        {{ room.last_msg }}
+                    </p>
+                    {% else %}
+                    <p class="text-xs text-gray-600 italic mt-1 leading-normal">
+                        작성된 대화가 없습니다.
+                    </p>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            {% else %}
+                <p class="text-xs text-gray-600 text-center py-8">속해있는 채팅방이 없습니다.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. 우측 채팅 메시지 영역 (Main Chat view) -->
+    <div class="flex-1 flex flex-col h-full bg-darkCard/20">
+        {% if active_room %}
+            <!-- 상단 헤더 -->
+            <div class="p-5 border-b border-gray-800/60 flex items-center justify-between shrink-0 bg-gray-950/10">
+                <div>
+                    <h3 class="font-bold text-gray-100 flex items-center gap-2">
+                        <i class="fa-solid fa-hashtag text-emerald-400"></i> {{ active_room.name }}
+                    </h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">
+                        총 {{ room_members | length }}명의 구성원 참여 중
+                    </p>
+                </div>
+                
+                <!-- 대화방 사원 리스트 (미니 가로 리스트) -->
+                <div class="flex items-center -space-x-2 overflow-hidden" id="members-status-bar">
+                    {% for member in room_members %}
+                    <div class="relative inline-block" title="{{ member.name }} ({{ member.position }})">
+                        {% if member.avatar_url %}
+                        <img class="h-7 w-7 rounded-full border-2 border-darkCard object-cover bg-darkBg" src="{{ member.avatar_url }}" alt="{{ member.name }}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+                        {% else %}
+                        <img class="h-7 w-7 rounded-full border-2 border-darkCard bg-darkBg" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="{{ member.name }}">
+                        {% endif %}
+                        <!-- 상태 도트 -->
+                        <span class="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-darkCard 
+                        {% if member.status == 'Online' %} bg-emerald-500
+                        {% elif member.status == 'Away' %} bg-amber-500
+                        {% else %} bg-gray-500 {% endif %}" data-status-user="{{ member.id }}"></span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 대화 메시지 영역 -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6" id="chat-messages-container">
+                {% for msg in messages %}
+                <div class="flex items-start gap-3 {% if msg.sender_id == g.user.id %} flex-row-reverse {% endif %} message-bubble" data-msg-id="{{ msg.id }}">
+                    <!-- 아바타 -->
+                    {% if msg.sender_id != g.user.id %}
+                    <div class="h-9 w-9 bg-gray-800 rounded-full flex items-center justify-center font-bold text-emerald-400 shrink-0 text-sm overflow-hidden border border-gray-800">
+                        {% if msg.sender_avatar %}
+                        <img src="{{ msg.sender_avatar }}" alt="avatar" class="object-cover h-full w-full" onerror="this.innerHTML='{{ msg.sender_name[0] }}'">
+                        {% else %}
+                        {{ msg.sender_name[0] }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- 말풍선 및 발신정보 -->
+                    <div class="max-w-[70%] space-y-1">
+                        {% if msg.sender_id != g.user.id %}
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs font-semibold text-gray-200">{{ msg.sender_name }}</span>
+                            <span class="text-[9px] text-gray-500">{{ msg.sender_dept }}</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- 메시지 바디 -->
+                        <div class="p-3.5 rounded-2xl leading-relaxed text-sm shadow-md 
+                        {% if msg.sender_id == g.user.id %} bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-none {% else %} bg-gray-800/80 text-gray-200 rounded-tl-none border border-gray-700/50 {% endif %}">
+                            {% if msg.message %}
+                            <p class="whitespace-pre-wrap">{{ msg.message }}</p>
+                            {% endif %}
+                            
+                            <!-- 첨부 이미지/파일 렌더링 -->
+                            {% if msg.file_url %}
+                                <div class="mt-2.5 pt-2 border-t border-white/10">
+                                    {% if '.png' in msg.file_url or '.jpg' in msg.file_url or '.jpeg' in msg.file_url or '.gif' in msg.file_url %}
+                                        <img src="{{ msg.file_url }}" alt="Attachment" class="max-h-48 rounded-lg border border-black/10 cursor-pointer hover:opacity-90 transition-opacity" onclick="window.open(this.src)">
+                                    {% else %}
+                                        <a href="{{ msg.file_url }}" download class="flex items-center gap-2 text-xs hover:underline 
+                                        {% if msg.sender_id == g.user.id %} text-emerald-100 {% else %} text-emerald-400 {% endif %}">
+                                            <i class="fa-solid fa-file-arrow-down text-sm"></i>
+                                            <span>첨부파일 다운로드</span>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 발신 시각 -->
+                        <p class="text-[9px] text-gray-500 {% if msg.sender_id == g.user.id %} text-right {% endif %}">
+                            {{ msg.created_at[11:16] }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- 하단 작성 입력부 -->
+            <div class="p-5 border-t border-gray-800/60 shrink-0 bg-gray-950/10">
+                <form id="message-form" onsubmit="submitMessage(event)" class="space-y-3" enctype="multipart/form-data">
+                    <div class="flex items-end gap-3 bg-[#0a0e1a]/80 border border-gray-800 focus-within:border-emerald-500/40 rounded-xl p-3 transition-colors relative">
+                        
+                        <!-- 파일 업로드 트리거 -->
+                        <label class="cursor-pointer text-gray-400 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-gray-800/40 transition-all" title="파일 첨부">
+                            <input type="file" id="message-file" name="file" class="hidden" onchange="updateFileIndicator(this)">
+                            <i class="fa-solid fa-paperclip text-base"></i>
+                        </label>
+                        
+                        <!-- 본문 입력 영역 -->
+                        <textarea id="message-text" name="message" rows="1" placeholder="메시지를 입력하세요... (Shift+Enter로 줄바꿈)" onkeydown="checkSubmit(event)" class="flex-1 bg-transparent border-0 outline-none text-sm text-gray-200 resize-none max-h-24 py-1.5"></textarea>
+                        
+                        <!-- 전송 버튼 -->
+                        <button type="submit" class="bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold h-9 w-9 rounded-xl flex items-center justify-center transition-all cursor-pointer">
+                            <i class="fa-solid fa-arrow-up text-sm"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- 첨부 대기 파일 인디케이터 -->
+                    <div id="file-indicator" class="hidden flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs text-emerald-400 w-fit">
+                        <i class="fa-solid fa-file text-[10px]"></i>
+                        <span id="file-name" class="font-medium truncate max-w-xs">file.png</span>
+                        <button type="button" onclick="clearFileSelection()" class="text-gray-400 hover:text-red-400 transition-colors ml-1">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+        {% else %}
+            <!-- 대화 채널 미선택 시 기본 뷰 -->
+            <div class="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <div class="h-16 w-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 text-2xl active-glow">
+                    <i class="fa-regular fa-paper-plane"></i>
+                </div>
+                <div class="space-y-1">
+                    <h4 class="text-base font-bold text-gray-200">SEVEN_BOARD 메신저</h4>
+                    <p class="text-xs text-gray-500 max-w-xs leading-relaxed">
+                        소통을 시작할 채널방을 왼쪽에서 선택하거나, '생성' 버튼을 눌러 새로운 사원들과 1:1 및 그룹 채팅방을 개설해 보세요.
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 3. 채팅방 생성 모달 -->
+<div id="create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="w-full max-w-md bg-darkCard border border-gray-800 rounded-2xl p-6 shadow-2xl space-y-6">
+        <div class="flex justify-between items-center border-b border-gray-800/60 pb-3">
+            <h4 class="font-bold text-gray-100 flex items-center gap-2">
+                <i class="fa-regular fa-comments text-emerald-400"></i> 새로운 채팅 채널 개설
+            </h4>
+            <button onclick="toggleCreateModal(false)" class="text-gray-400 hover:text-gray-200 cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <form action="{{ url_for('api_create_room') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">채널방 이름</label>
+                <input type="text" name="room_name" placeholder="예: [개발팀] 급한 이슈 대화방" required class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2.5 px-4 text-sm text-gray-100 placeholder-gray-500 outline-none transition-colors">
+            </div>
+            
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">참여자 선택 (다중 선택 가능)</label>
+                <div class="bg-[#0a0e1a]/80 border border-gray-800 rounded-xl p-3 max-h-48 overflow-y-auto space-y-2">
+                    {% for user in all_users %}
+                    <label class="flex items-center gap-3 p-2 hover:bg-gray-800/40 rounded-lg cursor-pointer transition-colors text-xs">
+                        <input type="checkbox" name="user_ids" value="{{ user.id }}" class="accent-emerald-500 h-4 w-4">
+                        <div>
+                            <span class="font-semibold text-gray-200">{{ user.name }} {{ user.position }}</span>
+                            <span class="text-[10px] text-gray-500 ml-1.5">{{ user.department }}</span>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all text-xs cursor-pointer">
+                채널 개설하기
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 실시간 Short Polling 및 Chat Logic Script -->
+{% if active_room %}
+<script>
+    const chatContainer = document.getElementById('chat-messages-container');
+    const activeRoomId = "{{ active_room.id }}";
+    
+    // 페이지 진입 시 자동으로 스크롤 하단 고정
+    function scrollToBottom() {
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+    scrollToBottom();
+
+    // 파일 선택 시 인디케이터 렌더링
+    function updateFileIndicator(input) {
+        const file = input.files[0];
+        const indicator = document.getElementById('file-indicator');
+        const fileName = document.getElementById('file-name');
+        
+        if (file) {
+            fileName.textContent = file.name;
+            indicator.classList.remove('hidden');
+        } else {
+            indicator.classList.add('hidden');
+        }
+    }
+
+    // 파일 지우기
+    function clearFileSelection() {
+        const input = document.getElementById('message-file');
+        const indicator = document.getElementById('file-indicator');
+        if (input) input.value = '';
+        if (indicator) indicator.classList.add('hidden');
+    }
+
+    // Shift + Enter 가 아닌 Enter 입력 시 즉시 메시지 폼 전송
+    function checkSubmit(event) {
+        if (event.keyCode === 13 && !event.shiftKey) {
+            event.preventDefault();
+            document.getElementById('message-form').dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+    }
+
+    // Ajax 메시지 발송
+    async function submitMessage(event) {
+        event.preventDefault();
+        const textInput = document.getElementById('message-text');
+        const fileInput = document.getElementById('message-file');
+        
+        const message = textInput.value.trim();
+        const file = fileInput.files[0];
+        
+        if (!message && !file) return;
+        
+        const formData = new FormData();
+        formData.append('message', message);
+        if (file) {
+            formData.append('file', file);
+        }
+        
+        // 폼 초기화
+        textInput.value = '';
+        clearFileSelection();
+        
+        try {
+            const res = await fetch(`/api/chat/${activeRoomId}/send`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                // 전송 성공 시 즉시 갱신
+                await pollMessages();
+                scrollToBottom();
+            }
+        } catch (err) {
+            console.error("메시지 전송 오류:", err);
+        }
+    }
+
+    // --- 2초 주기 숏 폴링 (Short Polling) 로직 ---
+    let lastMessageCount = {{ messages | length }};
+    
+    async function pollMessages() {
+        try {
+            const res = await fetch(`/api/chat/${activeRoomId}/messages`);
+            const data = await res.json();
+            
+            // 1. 메시지 업데이트
+            if (data.messages && data.messages.length > 0) {
+                // 메시지 카운트가 늘어났거나 갱신되었을 때만 DOM 재구성
+                if (data.messages.length !== lastMessageCount) {
+                    renderChatMessages(data.messages, data.my_id);
+                    lastMessageCount = data.messages.length;
+                    scrollToBottom();
+                }
+            }
+            
+            // 2. 사원 접속상태 동적 업데이트
+            if (data.statuses) {
+                updateMembersStatus(data.statuses);
+            }
+            
+        } catch (err) {
+            console.error("폴링 오류:", err);
+        }
+    }
+
+    // 실시간 메시지 DOM 렌더러
+    function renderChatMessages(messages, myId) {
+        if (!chatContainer) return;
+        
+        let html = '';
+        messages.forEach(msg => {
+            const isMe = (msg.sender_id === myId);
+            
+            html += `
+            <div class="flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''} message-bubble" data-msg-id="${msg.id}">
+                ${!isMe ? `
+                <div class="h-9 w-9 bg-gray-800 rounded-full flex items-center justify-center font-bold text-emerald-400 shrink-0 text-sm overflow-hidden border border-gray-800">
+                    ${msg.sender_avatar ? `<img src="${msg.sender_avatar}" class="object-cover h-full w-full">` : msg.sender_name[0]}
+                </div>
+                ` : ''}
+
+                <div class="max-w-[70%] space-y-1">
+                    ${!isMe ? `
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-semibold text-gray-200">${msg.sender_name}</span>
+                        <span class="text-[9px] text-gray-500">${msg.sender_dept}</span>
+                    </div>
+                    ` : ''}
+
+                    <div class="p-3.5 rounded-2xl leading-relaxed text-sm shadow-md 
+                    ${isMe ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-none' : 'bg-gray-800/80 text-gray-200 rounded-tl-none border border-gray-700/50'}">
+                        ${msg.message ? `<p class="whitespace-pre-wrap">${msg.message}</p>` : ''}
+                        
+                        ${msg.file_url ? `
+                            <div class="mt-2.5 pt-2 border-t border-white/10">
+                                ${msg.file_url.match(/\.(png|jpg|jpeg|gif)$/i) ? `
+                                    <img src="${msg.file_url}" class="max-h-48 rounded-lg border border-black/10 cursor-pointer hover:opacity-90 transition-opacity" onclick="window.open(this.src)">
+                                ` : `
+                                    <a href="${msg.file_url}" download class="flex items-center gap-2 text-xs hover:underline ${isMe ? 'text-emerald-100' : 'text-emerald-400'}">
+                                        <i class="fa-solid fa-file-arrow-down text-sm"></i>
+                                        <span>첨부파일 다운로드</span>
+                                    </a>
+                                `}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <p class="text-[9px] text-gray-500 ${isMe ? 'text-right' : ''}">
+                        ${msg.created_at.substring(11, 16)}
+                    </p>
+                </div>
+            </div>
+            `;
+        });
+        
+        chatContainer.innerHTML = html;
+    }
+
+    // 접속상태 도트 갱신러
+    function updateMembersStatus(statuses) {
+        statuses.forEach(user => {
+            const dot = document.querySelector(`[data-status-user="${user.id}"]`);
+            if (dot) {
+                dot.className = "absolute bottom-0 right-0 h-2 w-2 rounded-full border border-darkCard";
+                if (user.status === 'Online') {
+                    dot.classList.add('bg-emerald-500');
+                } else if (user.status === 'Away') {
+                    dot.classList.add('bg-amber-500');
+                } else {
+                    dot.classList.add('bg-gray-500');
+                }
+            }
+        });
+    }
+
+    // 2초 간격 숏 폴링 구동
+    setInterval(pollMessages, 2000);
+</script>
+{% endif %}
+
+<script>
+    // 채팅 채널 생성 모달 제어
+    function toggleCreateModal(show) {
+        const modal = document.getElementById('create-modal');
+        if (show) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+
+    // 좌측 사이드바 채팅 채널 클라이언트 필터링
+    function filterRooms() {
+        const query = document.getElementById('room-search').value.toLowerCase();
+        const rooms = document.querySelectorAll('.room-item');
+        
+        rooms.forEach(room => {
+            const name = room.getAttribute('data-name').toLowerCase();
+            if (name.includes(query)) {
+                room.style.display = 'block';
+            } else {
+                room.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}

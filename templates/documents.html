@@ -1,0 +1,98 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in">
+
+    <!-- 상단 타이틀 -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold font-outfit text-gray-100 flex items-center gap-2">
+                <i class="fa-solid fa-file-invoice-dollar text-emerald-400"></i> 사내 행정 서류 양식함
+            </h2>
+            <p class="text-xs text-gray-400 mt-1">부서별 최신 결재 양식, 기획서, 회계 서류 양식을 클릭 한 번으로 다운로드할 수 있습니다.</p>
+        </div>
+    </div>
+
+    <!-- 필터 및 검색창 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <!-- 카테고리 필터 -->
+        <div class="md:col-span-3 flex flex-wrap gap-2">
+            {% set categories = [('All', '전체 문서'), ('HR', '👤 인사/휴가'), ('Finance', '📊 기획/회계'), ('General', '📁 일반서식')] %}
+            {% for cat_val, cat_label in categories %}
+            <a href="{{ url_for('documents', category=cat_val, search=search) }}" 
+               class="px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-300
+               {% if category == cat_val %} bg-emerald-500/15 text-emerald-400 border-emerald-500/30 active-glow
+               {% else %} bg-gray-900/40 text-gray-400 border-gray-800/80 hover:text-gray-200 hover:bg-gray-800/40 {% endif %}">
+                {{ cat_label }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- 검색창 -->
+        <form action="{{ url_for('documents') }}" method="GET" class="relative">
+            <input type="hidden" name="category" value="{{ category }}">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 text-xs">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input type="text" name="search" value="{{ search }}" placeholder="양식 파일 이름 검색..." class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 pl-10 pr-4 text-xs outline-none transition-colors text-gray-200">
+        </form>
+    </div>
+
+    <!-- 문서 카드 그리드 목록 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% if docs %}
+            {% for doc in docs %}
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80 hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between space-y-5 group">
+                
+                <div class="space-y-3">
+                    <!-- 상단 헤더 (아이콘 + 버전배지) -->
+                    <div class="flex justify-between items-start">
+                        <div class="h-10 w-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 text-lg group-hover:scale-110 transition-all">
+                            {% if doc.category == 'HR' %}
+                            <i class="fa-solid fa-user-tie"></i>
+                            {% elif doc.category == 'Finance' %}
+                            <i class="fa-solid fa-file-invoice"></i>
+                            {% else %}
+                            <i class="fa-solid fa-folder-open"></i>
+                            {% endif %}
+                        </div>
+                        <span class="text-[9px] font-mono font-bold bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded-md">
+                            Version {{ doc.version }}
+                        </span>
+                    </div>
+
+                    <!-- 문서 타이틀 & 상세 설명 -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-200 group-hover:text-emerald-400 transition-colors">
+                            {{ doc.title }}
+                        </h4>
+                        <p class="text-xs text-gray-400 leading-relaxed mt-2">
+                            {{ doc.description }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 다운로드 버튼 & 카운팅 -->
+                <div class="pt-4 border-t border-gray-800/60 flex items-center justify-between">
+                    <span class="text-[10px] text-gray-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrow-down-long text-emerald-500/80"></i>
+                        <span>다운로드 <span class="font-bold text-gray-300 font-mono">{{ doc.download_count }}</span>회</span>
+                    </span>
+
+                    <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="bg-gray-800 hover:bg-emerald-500 hover:text-darkBg text-gray-200 text-xs font-bold px-3.5 py-2 rounded-xl border border-gray-700 hover:border-emerald-500 transition-all flex items-center gap-2 cursor-pointer">
+                        <span>다운로드</span>
+                        <i class="fa-solid fa-download text-[10px]"></i>
+                    </a>
+                </div>
+
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-span-3 p-12 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-2xl">
+                검색 조건에 부합하는 사내 서류 양식이 없습니다.
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

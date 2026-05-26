@@ -1,0 +1,203 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in">
+
+    <!-- 1. 웰컴 베너 -->
+    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-transparent border border-emerald-500/20 p-8 flex items-center justify-between">
+        <div class="space-y-2 z-10">
+            <h2 class="text-2xl font-bold font-outfit">
+                반갑습니다, <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">{{ g.user.name }} {{ g.user.position }}님!</span> 👋
+            </h2>
+            <p class="text-sm text-gray-400">
+                오늘도 {{ g.user.department }}팀원들과 함께 활기차고 효율적인 협업을 시작해 보세요.
+            </p>
+        </div>
+        <div class="h-24 w-24 bg-emerald-500/10 rounded-full blur-2xl absolute -right-6 -bottom-6 pointer-events-none"></div>
+    </div>
+
+    <!-- 2. 대시보드 메인 그리드 레이아웃 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- 좌측 컬럼 (2칸 병합) -->
+        <div class="lg:col-span-2 space-y-8">
+            
+            <!-- 공지사항 위젯 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-bullhorn text-emerald-400"></i> 사내 최신 공지사항
+                    </h3>
+                    <a href="{{ url_for('board_list', category='Notice') }}" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                        전체보기 <i class="fa-solid fa-angle-right text-[10px]"></i>
+                    </a>
+                </div>
+                
+                <div class="space-y-4">
+                    {% if notices %}
+                        {% for notice in notices %}
+                        <a href="{{ url_for('board_detail', post_id=notice.id) }}" class="block p-4 rounded-xl bg-gray-900/40 border border-gray-800/60 hover:border-emerald-500/30 transition-all duration-300">
+                            <div class="flex justify-between items-start gap-4">
+                                <div class="space-y-1">
+                                    <h4 class="text-sm font-semibold text-gray-100 hover:text-emerald-400 transition-colors line-clamp-1">
+                                        {{ notice.title }}
+                                    </h4>
+                                    <p class="text-xs text-gray-400 line-clamp-1">
+                                        {{ notice.content | replace('#', '') | replace('*', '') }}
+                                    </p>
+                                </div>
+                                <span class="shrink-0 text-[10px] text-gray-500 font-medium">
+                                    {{ notice.created_at[:10] }}
+                                </span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-xs text-gray-500 text-center py-6">새로운 공지사항이 없습니다.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 최근 메신저 대화 목록 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-comments text-emerald-400"></i> 최신 대화 목록
+                    </h3>
+                    <a href="{{ url_for('chat') }}" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                        메신저 열기 <i class="fa-solid fa-angle-right text-[10px]"></i>
+                    </a>
+                </div>
+
+                <div class="space-y-4">
+                    {% if recent_messages %}
+                        {% for msg in recent_messages %}
+                        <div class="p-4 rounded-xl bg-gray-900/40 border border-gray-800/60 flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="h-9 w-9 bg-gray-800 rounded-full flex items-center justify-center text-sm font-bold text-emerald-400">
+                                    {{ msg.sender_name[0] }}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold">{{ msg.sender_name }}</span>
+                                        <span class="text-[9px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded-md">{{ msg.room_name }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-1 line-clamp-1">{{ msg.message }}</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] text-gray-500 shrink-0">{{ msg.created_at[11:16] }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-xs text-gray-500 text-center py-6">참여 중인 활성 대화방 메시지가 없습니다.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 우측 컬럼 (1칸) -->
+        <div class="space-y-8">
+            
+            <!-- 🍱 오늘의 식단 위젯 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-utensils text-emerald-400"></i> 오늘의 식단표
+                    </h3>
+                    <a href="{{ url_for('menu') }}" class="text-xs text-emerald-400 hover:text-emerald-300">
+                        평가하기
+                    </a>
+                </div>
+
+                {% if today_menu %}
+                <div class="space-y-4">
+                    <!-- 중식 -->
+                    <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800/60">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">중식 (Lunch)</span>
+                            <div class="text-amber-400 text-xs flex items-center gap-1">
+                                <i class="fa-solid fa-star"></i>
+                                <span class="font-semibold">{{ menu_rating_avg if menu_rating_avg > 0 else '평점 없음' }}</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-300 leading-relaxed font-mono">{{ today_menu.lunch_menu }}</p>
+                    </div>
+
+                    <!-- 석식 -->
+                    {% if today_menu.dinner_menu %}
+                    <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800/60">
+                        <span class="text-xs font-bold text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-md inline-block mb-2">석식 (Dinner)</span>
+                        <p class="text-xs text-gray-300 leading-relaxed font-mono">{{ today_menu.dinner_menu }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="bg-gray-900/50 p-6 rounded-xl border border-gray-800/60 text-center space-y-2">
+                    <p class="text-xs text-gray-400">오늘 등록된 사내 식단이 없습니다.</p>
+                    <p class="text-[10px] text-gray-500">일자: {{ today_str }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 🌐 내 사내 IP 현황 위젯 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80">
+                <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-network-wired text-emerald-400"></i> 내 사내 IP 주소
+                </h3>
+                
+                {% if my_ip %}
+                <div class="bg-gradient-to-tr from-emerald-500/10 to-teal-500/5 p-4 rounded-xl border border-emerald-500/20 text-center space-y-2 active-glow">
+                    <p class="text-xs text-gray-400">현재 할당된 IP 대역</p>
+                    <h4 class="text-xl font-bold font-mono text-emerald-400 tracking-wider">
+                        {{ my_ip.ip_address }}
+                    </h4>
+                    <div class="flex justify-center gap-2 text-[10px] text-gray-500">
+                        <span>맥주소: {{ my_ip.mac_address }}</span>
+                        <span>·</span>
+                        <span>{{ my_ip.device_type }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="bg-gray-900/50 p-6 rounded-xl border border-gray-800/60 text-center space-y-3">
+                    <p class="text-xs text-gray-400">사내에 등록된 할당 IP가 없습니다.</p>
+                    <a href="{{ url_for('network') }}" class="inline-block bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold px-4 py-2 rounded-xl border border-gray-700 transition-colors">
+                        IP 자동 감지 및 등록 신청
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- ⭐ 자주 쓰는 서류 양식 빠른 다운로드 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80">
+                <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-file-invoice text-emerald-400"></i> 인기 양식 파일
+                </h3>
+                
+                <div class="space-y-3">
+                    {% if fav_docs %}
+                        {% for doc in fav_docs %}
+                        <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="flex items-center justify-between p-3 rounded-xl bg-gray-900/30 border border-gray-800/60 hover:bg-emerald-500/5 hover:border-emerald-500/20 transition-all group">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <i class="fa-solid fa-file-word text-emerald-400 group-hover:scale-110 transition-transform"></i>
+                                <span class="text-xs font-medium text-gray-300 group-hover:text-gray-100 transition-colors truncate">
+                                    {{ doc.title }}
+                                </span>
+                            </div>
+                            <span class="text-[9px] text-gray-500 shrink-0">
+                                {{ doc.download_count }}회 다운로드
+                            </span>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-xs text-gray-500 text-center py-4">등록된 서류 서식이 없습니다.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in">
+
+    <!-- 상단 타이틀 -->
+    <div>
+        <h2 class="text-2xl font-bold font-outfit text-gray-100 flex items-center gap-2">
+            <i class="fa-solid fa-network-wired text-emerald-400"></i> 사내 네트워크 IP 할당 현황
+        </h2>
+        <p class="text-xs text-gray-400 mt-1">
+            사내 기기 간 IP 충돌 방지를 위해 할당된 IP 대역을 조회하고, 신규 할당된 IP를 안전하게 등록/관리하는 대시보드입니다.
+        </p>
+    </div>
+
+    <!-- 1. 중복 에러/경고 표시 위젯 -->
+    {% if error %}
+    <div class="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-5 py-4 rounded-2xl flex items-start gap-3 active-glow">
+        <i class="fa-solid fa-triangle-exclamation text-lg shrink-0 mt-0.5"></i>
+        <div>
+            <h5 class="font-bold">IP 충돌 경고!</h5>
+            <p class="text-[11px] text-red-400/80 mt-1">{{ error }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 2. 상단 섹션: 내 IP 자동 감지 & 신규 등록 폼 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- 좌측: 내 IP 감지 콘솔 -->
+        <div class="lg:col-span-1 glass-panel rounded-2xl p-6 border border-gray-800/80 shadow-2xl flex flex-col justify-between">
+            <div class="space-y-4">
+                <h3 class="font-outfit font-bold text-gray-200 border-b border-gray-800/60 pb-3 text-xs tracking-wider uppercase">
+                    내 접속 IP 실시간 감지
+                </h3>
+                <div class="bg-gradient-to-tr from-emerald-500/10 to-teal-500/5 p-6 rounded-2xl border border-emerald-500/20 text-center space-y-2 active-glow">
+                    <p class="text-[10px] text-gray-400 font-medium">감지된 외부 클라이언트 IP</p>
+                    <h4 class="text-2xl font-bold font-mono text-emerald-400 tracking-wider">
+                        {{ client_ip }}
+                    </h4>
+                    <span class="inline-block text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
+                        감지 완료
+                    </span>
+                </div>
+            </div>
+            
+            <p class="text-[10px] text-gray-500 mt-4 leading-normal">
+                * 로컬 호스트 테스트 환경에서는 접속 경로에 따라 `127.0.0.1` 또는 `localhost`로 감지될 수 있습니다. 감지된 IP를 우측 폼에 대입해 즉시 등록 신청하세요.
+            </p>
+        </div>
+
+        <!-- 우측: IP 등록/신청 폼 -->
+        <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-gray-800/80 shadow-2xl space-y-4">
+            <h3 class="font-outfit font-bold text-gray-200 border-b border-gray-800/60 pb-3 text-xs tracking-wider uppercase">
+                신규 기기 및 할당 IP 등록 폼
+            </h3>
+
+            <form action="{{ url_for('api_register_ip') }}" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- IP 주소 입력 -->
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">할당 IP 주소</label>
+                    <input type="text" name="ip_address" value="{{ client_ip }}" placeholder="예: 192.168.10.12" required class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-gray-100 placeholder-gray-500 outline-none transition-colors font-mono">
+                </div>
+
+                <!-- 맥 주소 입력 -->
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">기기 맥 주소(MAC)</label>
+                    <input type="text" name="mac_address" placeholder="예: AA:BB:CC:DD:EE:FF" required class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-gray-100 placeholder-gray-500 outline-none transition-colors font-mono">
+                </div>
+
+                <!-- 기기 종류 셀렉트 -->
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">기기 분류</label>
+                    <div class="relative">
+                        <select name="device_type" required class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-gray-200 outline-none transition-colors appearance-none cursor-pointer">
+                            <option value="Laptop">노트북 (Laptop)</option>
+                            <option value="Desktop">데스크톱 메인 PC (Desktop)</option>
+                            <option value="Test Phone">모바일 테스트 기기 (Mobile)</option>
+                            <option value="Server">공용 부서 서버 (Server)</option>
+                        </select>
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 pointer-events-none text-xs">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 장비 메모 정보 -->
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">사용 장비 메모</label>
+                    <input type="text" name="memo" placeholder="예: 개발용 여분 모니터 본체" class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-gray-100 placeholder-gray-500 outline-none transition-colors">
+                </div>
+
+                <!-- 전송 버튼 (full width) -->
+                <div class="md:col-span-2 pt-2">
+                    <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all text-xs cursor-pointer">
+                        사내 할당 IP 등록 요청
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- 3. 사내 IP 할당 전체 리스트 테이블 -->
+    <div class="glass-panel rounded-2xl overflow-hidden border border-gray-800/80 shadow-2xl">
+        <div class="p-5 bg-gray-900/40 border-b border-gray-800/60 flex items-center justify-between">
+            <h3 class="font-outfit font-bold text-gray-200 text-xs tracking-wider uppercase">
+                사내 전체 IP 주소 할당 대장
+            </h3>
+            <span class="text-[10px] text-gray-500">총 {{ ips | length }}개 IP 기기 등록됨</span>
+        </div>
+        
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-900/20 text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-800/60">
+                    <th class="px-6 py-4 w-40">할당 IP 주소</th>
+                    <th class="px-6 py-4 w-40">배정 대상자</th>
+                    <th class="px-6 py-4 w-28">장비 종류</th>
+                    <th class="px-6 py-4 w-44">맥 주소 (MAC)</th>
+                    <th class="px-6 py-4">상세 메모</th>
+                    <th class="px-6 py-4 w-24 text-center">할당상태</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/40 text-xs">
+                {% if ips %}
+                    {% for ip in ips %}
+                    <tr class="hover:bg-gray-900/10 transition-colors">
+                        <!-- IP 주소 -->
+                        <td class="px-6 py-4 font-bold font-mono text-emerald-400">
+                            {{ ip.ip_address }}
+                        </td>
+                        
+                        <!-- 사원 이름 -->
+                        <td class="px-6 py-4">
+                            {% if ip.user_name %}
+                                <div class="font-semibold text-gray-200">
+                                    {{ ip.user_name }} {{ ip.user_pos }}
+                                </div>
+                                <span class="text-[9px] text-gray-500 block font-normal">{{ ip.user_dept }}</span>
+                            {% else %}
+                                <span class="text-gray-500 italic">미할당 (공용 장비)</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- 기기 분류 -->
+                        <td class="px-6 py-4 text-gray-300">
+                            <span class="flex items-center gap-1.5">
+                                {% if ip.device_type == 'Laptop' %}
+                                <i class="fa-solid fa-laptop text-gray-500"></i> 노트북
+                                {% elif ip.device_type == 'Desktop' %}
+                                <i class="fa-solid fa-desktop text-gray-500"></i> 메인 PC
+                                {% elif ip.device_type == 'Test Phone' %}
+                                <i class="fa-solid fa-mobile-screen-button text-gray-500"></i> 모바일
+                                {% else %}
+                                <i class="fa-solid fa-server text-gray-500"></i> 서버
+                                {% endif %}
+                            </span>
+                        </td>
+                        
+                        <!-- MAC 주소 -->
+                        <td class="px-6 py-4 font-mono text-gray-500">
+                            {{ ip.mac_address | default('-') }}
+                        </td>
+                        
+                        <!-- 메모 -->
+                        <td class="px-6 py-4 text-gray-400">
+                            {{ ip.memo | default('-') }}
+                        </td>
+
+                        <!-- 상태 배지 -->
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 active-glow">
+                                Active
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-xs text-gray-500">
+                            할당된 네트워크 IP 내역이 없습니다.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

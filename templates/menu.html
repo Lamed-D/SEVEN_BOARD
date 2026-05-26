@@ -1,0 +1,284 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in">
+
+    <!-- 타이틀 바 -->
+    <div>
+        <h2 class="text-2xl font-bold font-outfit text-gray-100 flex items-center gap-2">
+            <i class="fa-solid fa-utensils text-emerald-400"></i> 사내 주간 식단표
+        </h2>
+        <p class="text-xs text-gray-400 mt-1">
+            요일별 복지 식단을 미리 확인하시고, 별점 및 한줄평 후기로 피드백을 전달해 주세요.
+        </p>
+    </div>
+
+    <!-- 1. 주간 식단표 가로 그리드 (요일별 카드) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        {% if menus %}
+            {% for menu in menus %}
+            {% set menu_stat = stats[menu.id] %}
+            <div onclick="selectMenuDate('{{ menu.id }}')" 
+                 class="menu-card cursor-pointer p-5 rounded-2xl border transition-all duration-300 relative group
+                 {% if today_str == menu.menu_date %} bg-gradient-to-tr from-emerald-500/10 to-teal-500/5 border-emerald-500/30 active-glow active-day-card
+                 {% else %} bg-gray-900/40 border-gray-800/80 hover:border-gray-700 {% endif %}" 
+                 id="card-{{ menu.id }}"
+                 data-date="{{ menu.menu_date }}"
+                 data-lunch="{{ menu.lunch_menu }}"
+                 data-dinner="{{ menu.dinner_menu | default('식단이 없습니다.') }}"
+                 data-avg="{{ menu_stat.avg }}"
+                 data-count="{{ menu_stat.count }}">
+                 
+                <!-- 오늘 날짜 하이라이트 배지 -->
+                {% if today_str == menu.menu_date %}
+                <span class="absolute -top-2.5 right-4 text-[9px] font-bold bg-emerald-500 text-darkBg px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                    Today
+                </span>
+                {% endif %}
+
+                <div class="space-y-3">
+                    <p class="text-xs font-semibold text-gray-400 font-mono">{{ menu.menu_date }}</p>
+                    <h4 class="text-sm font-bold text-gray-200 group-hover:text-emerald-400 transition-colors">
+                        {% set days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'] %}
+                        <!-- 파이썬 date 파싱 생략을 위해 단순 요일 계산(실 로직 구현은 JS에서 처리함) -->
+                        <span class="day-label">식단 일자</span>
+                    </h4>
+                    
+                    <!-- 중식 미리보기 -->
+                    <div class="text-[11px] text-gray-400 font-sans line-clamp-2 mt-1">
+                        {{ menu.lunch_menu }}
+                    </div>
+
+                    <!-- 요약 스태츠 -->
+                    <div class="flex items-center justify-between pt-3 border-t border-gray-800/60 text-[10px] text-gray-500">
+                        <span class="flex items-center gap-1 text-amber-400">
+                            <i class="fa-solid fa-star"></i>
+                            <span class="font-bold text-gray-300">{{ menu_stat.avg }}</span>
+                        </span>
+                        <span>리뷰 {{ menu_stat.count }}개</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-span-5 p-12 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-2xl">
+                등록된 주간 식단표가 존재하지 않습니다.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- 2. 선택된 식단 상세 보기 및 리뷰 관리 샌드박스 -->
+    {% if menus %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- 좌측: 식단 메뉴판 -->
+        <div class="lg:col-span-2 glass-panel rounded-2xl p-8 border border-gray-800/80 shadow-2xl space-y-6">
+            <h3 class="font-outfit font-bold text-gray-200 border-b border-gray-800/60 pb-3 flex items-center gap-2">
+                <i class="fa-solid fa-utensils text-emerald-400"></i> 
+                <span id="selected-day-title">수제 제육볶음</span> 식단 상세 정보
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 중식 카드 -->
+                <div class="p-6 bg-gray-900/50 border border-gray-800/80 rounded-2xl space-y-3">
+                    <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md">중식 (Lunch)</span>
+                    <p id="selected-lunch-menu" class="text-sm text-gray-300 leading-relaxed font-mono whitespace-pre-line pt-2">
+                        메뉴를 불러오는 중...
+                    </p>
+                </div>
+                
+                <!-- 석식 카드 -->
+                <div class="p-6 bg-gray-900/50 border border-gray-800/80 rounded-2xl space-y-3">
+                    <span class="text-xs font-bold text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-md">석식 (Dinner)</span>
+                    <p id="selected-dinner-menu" class="text-sm text-gray-300 leading-relaxed font-mono whitespace-pre-line pt-2">
+                        메뉴를 불러오는 중...
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측: 별점 평가 등록 & 한줄평 리스트 -->
+        <div class="space-y-6">
+            <!-- 1) 별점 등록 박스 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80 shadow-2xl">
+                <h4 class="font-bold text-gray-200 border-b border-gray-800/60 pb-3 mb-4 text-xs font-outfit tracking-wider uppercase">
+                    오늘의 급식/사식 평가
+                </h4>
+                
+                <form id="rating-form" action="" method="POST" class="space-y-4">
+                    <!-- 별점 선택 라디오 -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">오늘 식사 만족도</label>
+                        <div class="flex items-center gap-1.5 text-xl text-gray-600" id="star-selector">
+                            {% for i in range(1, 6) %}
+                            <label class="cursor-pointer hover:text-amber-400 transition-colors" onclick="highlightStars({{ i }})">
+                                <input type="radio" name="rating" value="{{ i }}" required class="hidden">
+                                <i class="fa-solid fa-star star-icon" data-star="{{ i }}"></i>
+                            </label>
+                            {% endfor %}
+                            <span class="text-xs text-gray-400 font-semibold ml-2" id="rating-label">만족도를 선택하세요</span>
+                        </div>
+                    </div>
+
+                    <!-- 한줄평 피드백 -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">한줄평 피드백</label>
+                        <textarea name="feedback" rows="2" placeholder="급식 운영진에게 전할 한줄평을 남겨주세요." class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-gray-200 outline-none transition-colors resize-none"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all text-xs cursor-pointer">
+                        피드백 등록하기
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2) 한줄평 피드백 보드 -->
+            <div class="glass-panel rounded-2xl p-6 border border-gray-800/80 shadow-2xl max-h-80 overflow-y-auto space-y-4">
+                <h4 class="font-bold text-gray-200 border-b border-gray-800/60 pb-3 text-xs font-outfit tracking-wider uppercase">
+                    임직원 한줄평 피드백 피드
+                </h4>
+                
+                <div id="feedback-feed-container" class="space-y-3">
+                    <!-- JS에서 동적 바인딩 -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- 식단 데이터 평점 피드백 핸들링 스크립트 -->
+<script>
+    // 식단 카드별로 요일 텍스트 매핑
+    document.querySelectorAll('.menu-card').forEach(card => {
+        const dateStr = card.getAttribute('data-date');
+        const dayLabel = card.querySelector('.day-label');
+        if (dayLabel) {
+            const dateObj = new Date(dateStr);
+            const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            dayLabel.textContent = days[dateObj.getDay()];
+        }
+    });
+
+    // 식단 날짜 선택 이벤트
+    let activeMenuId = "";
+    
+    function selectMenuDate(menuId) {
+        // 모든 카드에서 active 상태 제거
+        document.querySelectorAll('.menu-card').forEach(c => {
+            c.classList.remove('bg-gradient-to-tr', 'from-emerald-500/10', 'to-teal-500/5', 'border-emerald-500/30', 'active-glow', 'active-day-card');
+            c.classList.add('bg-gray-900/40', 'border-gray-800/80');
+        });
+        
+        // 선택한 카드 하이라이트
+        const card = document.getElementById(`card-${menuId}`);
+        if (card) {
+            card.classList.remove('bg-gray-900/40', 'border-gray-800/80');
+            card.classList.add('bg-gradient-to-tr', 'from-emerald-500/10', 'to-teal-500/5', 'border-emerald-500/30', 'active-glow', 'active-day-card');
+            
+            const date = card.getAttribute('data-date');
+            const lunch = card.getAttribute('data-lunch');
+            const dinner = card.getAttribute('data-dinner');
+            
+            // 데이터 매핑
+            const dateObj = new Date(date);
+            const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            document.getElementById('selected-day-title').textContent = `${date} (${days[dateObj.getDay()]})`;
+            document.getElementById('selected-lunch-menu').innerHTML = lunch.split(', ').join('<br>• ');
+            document.getElementById('selected-dinner-menu').innerHTML = dinner.split(', ').join('<br>• ');
+            
+            // 별점 폼 Action 변경
+            document.getElementById('rating-form').action = `/api/menus/${menuId}/rate`;
+            
+            // 피드백 불러오기
+            renderFeedbacks(menuId);
+        }
+        
+        activeMenuId = menuId;
+    }
+
+    // 각 식단 피드백 렌더러
+    // Flask 데이터객체를 JS 객체로 전송하기 위해 카드 엘리먼트 내 피드백 데이터를 주입/조회합니다.
+    const feedbackDataMap = {
+        {% for menu in menus %}
+        "{{ menu.id }}": [
+            {% for fb in stats[menu.id].feedbacks %}
+            {
+                "user_name": "{{ fb.user_name }}",
+                "rating": {{ fb.rating }},
+                "feedback": "{{ fb.feedback }}",
+                "created_at": "{{ fb.created_at[:16] }}"
+            },
+            {% endfor %}
+        ],
+        {% endfor %}
+    };
+
+    function renderFeedbacks(menuId) {
+        const feed = document.getElementById('feedback-feed-container');
+        const list = feedbackDataMap[menuId] || [];
+        
+        if (list.length === 0) {
+            feed.innerHTML = `<p class="text-xs text-gray-600 text-center py-4">등록된 식단 피드백이 없습니다.</p>`;
+            return;
+        }
+        
+        let html = '';
+        list.forEach(fb => {
+            let stars = '';
+            for(let i=1; i<=5; i++) {
+                stars += `<i class="fa-solid fa-star ${i <= fb.rating ? 'text-amber-400' : 'text-gray-700'}"></i>`;
+            }
+            
+            html += `
+            <div class="p-3 bg-gray-900/30 border border-gray-800/60 rounded-xl space-y-1.5 text-xs">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-gray-300">${fb.user_name}</span>
+                    <span class="text-[8px] text-gray-500">${fb.created_at}</span>
+                </div>
+                <div class="flex items-center gap-1 text-[10px]">
+                    ${stars}
+                </div>
+                <p class="text-gray-400 mt-1 leading-normal">${fb.feedback}</p>
+            </div>
+            `;
+        });
+        
+        feed.innerHTML = html;
+    }
+
+    // 별점 레이블 선택 하이라이트
+    const ratingLabels = {
+        1: '실망이에요 😡',
+        2: '아쉬워요 😕',
+        3: '보통이에요 😐',
+        4: '맛있어요 🙂',
+        5: '최고예요! 😍'
+    };
+
+    function highlightStars(rating) {
+        document.querySelectorAll('.star-icon').forEach(icon => {
+            const starVal = parseInt(icon.getAttribute('data-star'));
+            if (starVal <= rating) {
+                icon.className = "fa-solid fa-star star-icon text-amber-400 scale-105 transition-transform";
+            } else {
+                icon.className = "fa-solid fa-star star-icon text-gray-700";
+            }
+        });
+        document.getElementById('rating-label').textContent = ratingLabels[rating];
+        document.getElementById('rating-label').className = "text-xs text-amber-400 font-semibold ml-2";
+    }
+
+    // 초기 오늘 날짜 로딩
+    const todayCard = document.querySelector('.active-day-card');
+    if (todayCard) {
+        todayCard.click();
+    } else {
+        // 오늘자 식단 없으면 첫번째 카드 로딩
+        const firstCard = document.querySelector('.menu-card');
+        if (firstCard) firstCard.click();
+    }
+</script>
+{% endblock %}

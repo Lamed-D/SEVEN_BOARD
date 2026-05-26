@@ -1,0 +1,121 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in">
+
+    <!-- 상단 안내 및 필터 바 -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold font-outfit text-gray-100 flex items-center gap-2">
+                <i class="fa-solid fa-rectangle-list text-emerald-400"></i> 사내 통합 게시판
+            </h2>
+            <p class="text-xs text-gray-400 mt-1">공지사항 및 자유로운 의견 교환을 위한 소통 구역입니다.</p>
+        </div>
+        
+        <!-- 작성 버튼 -->
+        <a href="{{ url_for('board_write') }}" class="bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 hover:shadow-lg hover:shadow-emerald-500/10 active:scale-[0.98] transition-all cursor-pointer">
+            <i class="fa-solid fa-pen-nib"></i>
+            <span>새 글 작성</span>
+        </a>
+    </div>
+
+    <!-- 검색창 및 카테고리 필터링 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <!-- 카테고리 셀렉터 -->
+        <div class="md:col-span-3 flex flex-wrap gap-2">
+            {% set categories = [('All', '전체 게시판'), ('Notice', '📢 공지사항'), ('Free', '💬 자유게시판'), ('Dept_Dev', '💻 개발소통'), ('Dept_HR', '👥 인사소통')] %}
+            {% for cat_val, cat_label in categories %}
+            <a href="{{ url_for('board_list', category=cat_val, search=search) }}" 
+               class="px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-300
+               {% if category == cat_val %} bg-emerald-500/15 text-emerald-400 border-emerald-500/30 active-glow
+               {% else %} bg-gray-900/40 text-gray-400 border-gray-800/80 hover:text-gray-200 hover:bg-gray-800/40 {% endif %}">
+                {{ cat_label }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- 통합 검색 폼 -->
+        <form action="{{ url_for('board_list') }}" method="GET" class="relative">
+            <input type="hidden" name="category" value="{{ category }}">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 text-xs">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input type="text" name="search" value="{{ search }}" placeholder="제목, 본문, 작성자 검색..." class="w-full bg-[#0a0e1a]/80 border border-gray-800 focus:border-emerald-500/30 rounded-xl py-2 pl-10 pr-4 text-xs outline-none transition-colors text-gray-200">
+        </form>
+    </div>
+
+    <!-- 게시글 테이블 리스트 -->
+    <div class="glass-panel rounded-2xl overflow-hidden border border-gray-800/80 shadow-xl">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-900/50 text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-800/60">
+                    <th class="px-6 py-4 w-24 text-center">분류</th>
+                    <th class="px-6 py-4">게시글 제목</th>
+                    <th class="px-6 py-4 w-36">작성자</th>
+                    <th class="px-6 py-4 w-24 text-center">조회수</th>
+                    <th class="px-6 py-4 w-28 text-right">등록일자</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/40">
+                {% if posts %}
+                    {% for post in posts %}
+                    <tr class="hover:bg-gray-900/20 transition-colors group">
+                        <!-- 카테고리 배지 -->
+                        <td class="px-6 py-4 text-center shrink-0">
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-md
+                            {% if post.category == 'Notice' %} bg-red-500/10 text-red-400 border border-red-500/20
+                            {% elif post.category == 'Free' %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                            {% elif post.category == 'Dept_Dev' %} bg-blue-500/10 text-blue-400 border border-blue-500/20
+                            {% else %} bg-gray-800 text-gray-400 {% endif %}">
+                                {% if post.category == 'Notice' %} 공지
+                                {% elif post.category == 'Free' %} 자유
+                                {% elif post.category == 'Dept_Dev' %} 개발
+                                {% elif post.category == 'Dept_HR' %} 인사
+                                {% else %} 일반 {% endif %}
+                            </span>
+                        </td>
+                        
+                        <!-- 제목 및 댓글 개수 -->
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <a href="{{ url_for('board_detail', post_id=post.id) }}" class="text-xs font-semibold text-gray-200 hover:text-emerald-400 group-hover:translate-x-0.5 transition-all line-clamp-1">
+                                    {{ post.title }}
+                                </a>
+                                {% if post.comment_count > 0 %}
+                                <span class="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded-full">
+                                    {{ post.comment_count }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 작성자 -->
+                        <td class="px-6 py-4 text-xs font-medium text-gray-300">
+                            {{ post.author_name }}
+                            <span class="text-[9px] text-gray-500 block font-normal">{{ post.author_dept }}</span>
+                        </td>
+
+                        <!-- 조회수 -->
+                        <td class="px-6 py-4 text-center text-xs font-mono text-gray-500">
+                            {{ post.views }}
+                        </td>
+
+                        <!-- 등록 날짜 -->
+                        <td class="px-6 py-4 text-right text-xs font-mono text-gray-500">
+                            {{ post.created_at[:10] }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center text-xs text-gray-500">
+                            등록된 게시글이 없습니다.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

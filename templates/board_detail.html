@@ -1,0 +1,196 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6 animate-fade-in">
+
+    <!-- 1. 이전 페이지로 가기 -->
+    <a href="{{ url_for('board_list') }}" class="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-emerald-400 transition-colors">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>게시판 목록으로 돌아가기</span>
+    </a>
+
+    <!-- 2. 게시글 메인 상세 카드 -->
+    <article class="glass-panel rounded-2xl p-8 border border-gray-800/80 shadow-2xl space-y-6">
+        
+        <!-- 게시글 상단 헤더 -->
+        <div class="border-b border-gray-800/60 pb-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <!-- 카테고리 배지 -->
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-md
+                {% if post.category == 'Notice' %} bg-red-500/10 text-red-400 border border-red-500/20
+                {% elif post.category == 'Free' %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                {% elif post.category == 'Dept_Dev' %} bg-blue-500/10 text-blue-400 border border-blue-500/20
+                {% else %} bg-gray-800 text-gray-400 {% endif %}">
+                    {% if post.category == 'Notice' %} 공지사항
+                    {% elif post.category == 'Free' %} 자유게시판
+                    {% elif post.category == 'Dept_Dev' %} 개발부서 소통방
+                    {% elif post.category == 'Dept_HR' %} 인사부서 소통방
+                    {% else %} 게시판 {% endif %}
+                </span>
+
+                <!-- 조회수 & 날짜 -->
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                    <span><i class="fa-regular fa-eye mr-1.5"></i> 조회 {{ post.views }}</span>
+                    <span>·</span>
+                    <span><i class="fa-regular fa-clock mr-1.5"></i> {{ post.created_at }}</span>
+                </div>
+            </div>
+
+            <!-- 제목 -->
+            <h1 class="text-xl font-bold text-gray-100 font-outfit tracking-wide leading-snug">
+                {{ post.title }}
+            </h1>
+
+            <!-- 작성자 미니 정보 카드 -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-9 bg-gray-800 rounded-full flex items-center justify-center shrink-0 font-bold text-emerald-400 overflow-hidden border border-gray-700">
+                        {% if post.author_avatar %}
+                        <img src="{{ post.author_avatar }}" alt="avatar" class="object-cover h-full w-full" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+                        {% else %}
+                        {{ post.author_name[0] }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-gray-200">{{ post.author_name }} {{ post.author_position }}</p>
+                        <p class="text-[10px] text-gray-500">{{ post.author_dept }}</p>
+                    </div>
+                </div>
+
+                <!-- 내가 작성했거나 관리자인 경우 수정/삭제 버튼 -->
+                {% if post.author_id == g.user.id or g.user.is_admin %}
+                <div class="flex items-center gap-2">
+                    <a href="{{ url_for('board_edit', post_id=post.id) }}" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-3 py-1.5 rounded-lg border border-gray-700 transition-colors">
+                        수정
+                    </a>
+                    <a href="{{ url_for('board_delete', post_id=post.id) }}" onclick="return confirm('정말 이 게시글을 삭제하시겠습니까?')" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium px-3 py-1.5 rounded-lg border border-red-500/20 transition-colors">
+                        삭제
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 본문 내용 -->
+        <div class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap py-2 font-sans">
+            {{ post.content }}
+        </div>
+    </article>
+
+    <!-- 3. 댓글 섹션 (Comments) -->
+    <div class="glass-panel rounded-2xl p-8 border border-gray-800/80 shadow-2xl space-y-6">
+        <h3 class="font-outfit font-bold text-gray-200 flex items-center gap-2">
+            <i class="fa-solid fa-comment-dots text-emerald-400"></i> 댓글 
+            <span class="text-xs font-bold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full">
+                {{ (parent_comments | length) + (child_comments | length) }}
+            </span>
+        </h3>
+
+        <!-- 댓글 등록 입력 폼 -->
+        <form action="{{ url_for('api_add_comment', post_id=post.id) }}" method="POST" class="space-y-3">
+            <div class="bg-[#0a0e1a]/80 border border-gray-800 focus-within:border-emerald-500/40 rounded-xl p-3 transition-colors">
+                <textarea name="content" rows="2" placeholder="댓글을 남겨 소통을 시작해 보세요..." required class="w-full bg-transparent border-0 outline-none text-sm text-gray-200 resize-none py-1"></textarea>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold px-4 py-2 rounded-xl text-xs transition-all cursor-pointer">
+                    댓글 등록
+                </button>
+            </div>
+        </form>
+
+        <!-- 댓글 목록 루프 -->
+        <div class="space-y-5 pt-4">
+            {% if parent_comments %}
+                {% for comment in parent_comments %}
+                <div class="space-y-4">
+                    <!-- 상위 부모 댓글 -->
+                    <div class="p-4 rounded-xl bg-gray-900/30 border border-gray-800/60 flex items-start justify-between gap-3">
+                        <div class="flex gap-3">
+                            <!-- 아바타 -->
+                            <div class="h-8 w-8 bg-gray-800 rounded-full flex items-center justify-center shrink-0 font-bold text-emerald-400 overflow-hidden border border-gray-700">
+                                {% if comment.author_avatar %}
+                                <img src="{{ comment.author_avatar }}" alt="avatar" class="object-cover h-full w-full" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+                                {% else %}
+                                {{ comment.author_name[0] }}
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 본문 -->
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-gray-200">{{ comment.author_name }}</span>
+                                    <span class="text-[9px] text-gray-500">{{ comment.author_dept }}</span>
+                                    <span class="text-[8px] text-gray-600 font-mono">{{ comment.created_at[11:16] }}</span>
+                                </div>
+                                <p class="text-xs text-gray-300">{{ comment.content }}</p>
+                            </div>
+                        </div>
+
+                        <!-- 답글 달기 버튼 -->
+                        <button onclick="toggleReplyForm('{{ comment.id }}')" class="text-[10px] text-emerald-400 hover:underline shrink-0 cursor-pointer">
+                            답글 달기
+                        </button>
+                    </div>
+
+                    <!-- 대댓글 등록 비밀 폼 -->
+                    <div id="reply-form-{{ comment.id }}" class="hidden pl-10">
+                        <form action="{{ url_for('api_add_comment', post_id=post.id) }}" method="POST" class="space-y-2 bg-gray-950/20 p-4 rounded-xl border border-gray-800/80">
+                            <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                            <div class="border border-gray-800 focus-within:border-emerald-500/30 rounded-lg p-2 bg-[#0a0e1a]/80">
+                                <textarea name="content" rows="1" placeholder="답글 내용을 입력하세요..." required class="w-full bg-transparent border-0 outline-none text-xs text-gray-200 resize-none py-1"></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" onclick="toggleReplyForm('{{ comment.id }}')" class="text-gray-500 hover:text-gray-300 text-[10px] font-medium px-2 py-1 rounded cursor-pointer">취소</button>
+                                <button type="submit" class="bg-emerald-500 hover:bg-emerald-400 text-darkBg font-bold px-3 py-1 rounded text-[10px] cursor-pointer">답글 등록</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 대댓글 루프 (parent_id가 매핑되는 하위 댓글 목록) -->
+                    {% for child in child_comments %}
+                        {% if child.parent_id == comment.id %}
+                        <div class="pl-10 flex gap-2">
+                            <!-- ↳ 꺾쇠 기호 -->
+                            <span class="text-gray-600 text-xs shrink-0 select-none">↳</span>
+                            
+                            <!-- 대댓글 바디 -->
+                            <div class="flex-1 p-4 rounded-xl bg-gray-900/10 border border-gray-800/30 flex items-start gap-3">
+                                <div class="h-7 w-7 bg-gray-800 rounded-full flex items-center justify-center shrink-0 font-bold text-teal-400 overflow-hidden border border-gray-700">
+                                    {% if child.author_avatar %}
+                                    <img src="{{ child.author_avatar }}" alt="avatar" class="object-cover h-full w-full" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+                                    {% else %}
+                                    {{ child.author_name[0] }}
+                                    {% endif %}
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold text-gray-200">{{ child.author_name }}</span>
+                                        <span class="text-[9px] text-gray-500">{{ child.author_dept }}</span>
+                                        <span class="text-[8px] text-gray-600 font-mono">{{ child.created_at[11:16] }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-300">{{ child.content }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-xs text-gray-600 text-center py-6">첫 댓글을 남겨 소통해 보세요!</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // 대댓글 폼 오픈 토글러
+    function toggleReplyForm(commentId) {
+        const form = document.getElementById(`reply-form-${commentId}`);
+        if (form) {
+            form.classList.toggle('hidden');
+        }
+    }
+</script>
+{% endblock %}
